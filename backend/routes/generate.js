@@ -4,16 +4,36 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const OpenAI = require('openai');
 
-// AI 클라이언트 초기화
-const anthropic = new Anthropic({
-    apiKey: process.env.CLAUDE_API_KEY
-});
+// AI 클라이언트 조건부 초기화
+let anthropic = null;
+let genAI = null;
+let openai = null;
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// API 키 확인 및 클라이언트 초기화
+if (process.env.CLAUDE_API_KEY) {
+    anthropic = new Anthropic({
+        apiKey: process.env.CLAUDE_API_KEY
+    });
+    console.log('✓ Claude API 클라이언트 초기화 완료');
+} else {
+    console.warn('⚠ CLAUDE_API_KEY가 설정되지 않았습니다. Claude 모델을 사용할 수 없습니다.');
+}
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY
-});
+if (process.env.GEMINI_API_KEY) {
+    genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    console.log('✓ Gemini API 클라이언트 초기화 완료');
+} else {
+    console.warn('⚠ GEMINI_API_KEY가 설정되지 않았습니다. Gemini 모델을 사용할 수 없습니다.');
+}
+
+if (process.env.OPENAI_API_KEY) {
+    openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY
+    });
+    console.log('✓ OpenAI API 클라이언트 초기화 완료');
+} else {
+    console.warn('⚠ OPENAI_API_KEY가 설정되지 않았습니다. GPT-4o Mini 모델을 사용할 수 없습니다.');
+}
 
 // 프롬프트 템플릿 생성
 function createSystemPrompt(sceneCount, scenes) {
@@ -68,6 +88,10 @@ ${scenes.map(scene => `   - SHOT${scene.number}: ${scene.duration}초`).join('\n
 
 // Claude로 프롬프트 생성
 async function generateWithClaude(systemPrompt, userDescription) {
+    if (!anthropic) {
+        throw new Error('Claude API 키가 설정되지 않았습니다. .env 파일에 CLAUDE_API_KEY를 추가해주세요.');
+    }
+
     const message = await anthropic.messages.create({
         model: "claude-sonnet-4-20250514",
         max_tokens: 4096,
@@ -86,6 +110,10 @@ async function generateWithClaude(systemPrompt, userDescription) {
 
 // Gemini로 프롬프트 생성
 async function generateWithGemini(systemPrompt, userDescription) {
+    if (!genAI) {
+        throw new Error('Gemini API 키가 설정되지 않았습니다. .env 파일에 GEMINI_API_KEY를 추가해주세요.');
+    }
+
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
 
     const prompt = `${systemPrompt}
@@ -100,6 +128,10 @@ ${userDescription}`;
 
 // GPT-4o mini로 프롬프트 생성
 async function generateWithGPT(systemPrompt, userDescription) {
+    if (!openai) {
+        throw new Error('OpenAI API 키가 설정되지 않았습니다. .env 파일에 OPENAI_API_KEY를 추가해주세요.');
+    }
+
     const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
